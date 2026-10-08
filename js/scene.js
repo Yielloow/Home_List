@@ -222,11 +222,11 @@ function image(t) {
   // Le panier : au centre de la bande libre, à une taille qui y tient
   const yZone = (0.5 - (zone.haut + zone.bas) / 2) * hauteurMonde;
   const hZone = Math.max(1.5, (zone.bas - zone.haut) * hauteurMonde);
-  const tailleZone = Math.min(1.25, hZone / 3.2, largeurMonde / 4.6);
+  const tailleZone = Math.min(1.25, hZone / 4.2, largeurMonde / 4.6);
   const sPanier = THREE.MathUtils.lerp(0.001, tailleZone, melange);
   lePanier.scale.setScalar(sPanier);
   lePanier.visible = melange > 0.02;
-  lePanier.position.set(0, yZone - 0.15 * tailleZone + Math.sin(t * 1.1) * 0.08, 0);
+  lePanier.position.set(0, yZone - 0.45 * tailleZone + Math.sin(t * 1.1) * 0.08, 0);
   lePanier.rotation.y = t * 0.35;
 
   const tailleCo = Math.max(0.55, tailleZone * 0.8);
