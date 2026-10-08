@@ -42,6 +42,12 @@ export function nettoyerCode(texte) {
   return (texte || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
 }
 
+// Firestore refuse les champs `undefined` en levant une exception immédiate :
+// on les retire, une valeur absente vaut mieux qu'un ajout perdu.
+function propre(objet) {
+  return Object.fromEntries(Object.entries(objet).filter(([, v]) => v !== undefined));
+}
+
 function erreur(code) {
   const e = new Error(code);
   e.code = code;
@@ -162,18 +168,18 @@ async function depotFirebase() {
     nouvelId() {
       return fs.doc(produits()).id;
     },
-    creer(id, donnees) {
-      return fs.setDoc(produit(id), donnees);
+    async creer(id, donnees) {
+      return fs.setDoc(produit(id), propre(donnees));
     },
-    modifier(id, champs) {
-      return fs.updateDoc(produit(id), champs);
+    async modifier(id, champs) {
+      return fs.updateDoc(produit(id), propre(champs));
     },
-    modifierPlusieurs(changements) {
+    async modifierPlusieurs(changements) {
       const lot = fs.writeBatch(db);
-      for (const [id, champs] of changements) lot.update(produit(id), champs);
+      for (const [id, champs] of changements) lot.update(produit(id), propre(champs));
       return lot.commit();
     },
-    supprimer(id) {
+    async supprimer(id) {
       const lot = fs.writeBatch(db);
       lot.delete(produit(id));
       lot.delete(photo(id));
@@ -183,7 +189,7 @@ async function depotFirebase() {
       const s = await fs.getDoc(photo(id));
       return s.exists() ? s.data().image : null;
     },
-    ecrirePhoto(id, image) {
+    async ecrirePhoto(id, image) {
       return image ? fs.setDoc(photo(id), { image }) : fs.deleteDoc(photo(id));
     },
   };
@@ -244,6 +250,8 @@ function depotDemo() {
       return Math.random().toString(36).slice(2, 12);
     },
     async creer(id, donnees) {
+      // Même exigence que Firestore, pour que le mode essai attrape ces oublis
+      if (Object.values(donnees).includes(undefined)) throw new Error("Champ undefined refusé par Firestore");
       etat.produits[id] = { ...donnees };
       sauver();
     },

@@ -597,7 +597,7 @@ $("#form-produit").addEventListener("submit", (e) => {
     ecrire(depot.creer(id, {
       vignette: null, photo: false, ...champs,
       dansListe: true, achete: false, fois: 1, ajouteLe: Date.now(),
-      ajoutePar: compte ? compte.email : "",
+      ajoutePar: compte ? compte.pseudo || "" : "",
     }));
   }
   if (photoEnAttente) ecrire(depot.ecrirePhoto(id, photoEnAttente.grande));
