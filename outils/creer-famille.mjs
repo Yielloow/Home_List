@@ -5,6 +5,11 @@
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { randomInt, randomBytes } from "node:crypto";
+import { execSync } from "node:child_process";
+
+// Le jeton d'accès de la CLI ne dure qu'une heure : une commande Firebase
+// quelconque le renouvelle avant qu'on le lise.
+execSync("npx -y firebase-tools@latest projects:list", { stdio: "ignore" });
 
 const [nom, prefixe] = process.argv.slice(2);
 const PROJET = "home-list-cb734";
