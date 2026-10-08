@@ -1,0 +1,36 @@
+rules_version = '2';
+
+// Seuls les comptes déclarés dans la collection « membres » voient la liste.
+//
+// Pour donner l'accès à quelqu'un : créer son compte dans Authentication,
+// copier son « UID utilisateur », puis dans Firestore créer le document
+// membres/<UID> (un champ quelconque, par exemple nom = "Maman").
+// Ainsi aucune adresse e-mail n'apparaît dans ce dépôt public, et une personne
+// qui se créerait un compte toute seule ne verrait rien.
+
+service cloud.firestore {
+  match /databases/{base}/documents {
+
+    function membre() {
+      return request.auth != null
+        && exists(/databases/$(base)/documents/membres/$(request.auth.uid));
+    }
+
+    match /produits/{id} {
+      allow read, write: if membre();
+    }
+
+    match /photos/{id} {
+      allow read, delete: if membre();
+      allow create, update: if membre()
+        && request.resource.data.image is string
+        && request.resource.data.image.size() < 900000;
+    }
+
+    // La liste des membres se gère uniquement depuis la console Firebase
+    match /membres/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+  }
+}

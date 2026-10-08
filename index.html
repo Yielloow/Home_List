@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Ma liste de courses</title>
+  <meta name="description" content="La liste de courses de la maison, avec photos et produits déjà achetés.">
+  <meta name="theme-color" content="#fff6ec">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icones/icone.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icones/icone-180.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Courses">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <script type="importmap">
+    { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+  </script>
+</head>
+<body>
+  <canvas id="scene" aria-hidden="true"></canvas>
+
+  <!-- Écran de connexion -->
+  <main id="ecran-connexion" class="ecran" hidden>
+    <div class="connexion-haut">
+      <h1>Ma liste<br>de courses</h1>
+      <p class="sous-titre">Bonjour ! Connectez-vous pour voir la liste.</p>
+    </div>
+    <form id="form-connexion" class="carte connexion-carte" novalidate>
+      <label class="champ">
+        <span>Adresse e-mail</span>
+        <input id="c-email" type="email" autocomplete="username" inputmode="email" required>
+      </label>
+      <label class="champ">
+        <span>Mot de passe</span>
+        <div class="mdp">
+          <input id="c-mdp" type="password" autocomplete="current-password" required>
+          <button type="button" id="voir-mdp" class="btn-texte" aria-label="Afficher le mot de passe">Voir</button>
+        </div>
+      </label>
+      <p id="c-erreur" class="erreur" role="alert" hidden></p>
+      <button type="submit" class="btn btn-principal btn-large" id="c-bouton">Entrer</button>
+      <p id="c-demo" class="aide" hidden>Mode essai : Firebase n'est pas encore configuré. Tapez n'importe quoi pour entrer, rien n'est envoyé sur Internet.</p>
+    </form>
+  </main>
+
+  <!-- Application -->
+  <div id="ecran-app" class="ecran" hidden>
+    <header class="entete">
+      <div>
+        <h1 id="titre-vue">Ma liste</h1>
+        <p id="resume" class="resume"></p>
+      </div>
+      <button id="btn-menu" class="btn-rond" aria-label="Menu">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
+      </button>
+    </header>
+
+    <!-- Vue : la liste -->
+    <section id="vue-liste" class="vue">
+      <div id="liste-vide" class="vide" hidden>
+        <div class="vide-emoji">🧺</div>
+        <p class="vide-titre">La liste est vide</p>
+        <p>Appuyez sur le gros bouton vert <b>« Ajouter »</b> en bas pour noter ce qu'il faut acheter.</p>
+      </div>
+      <div id="liste"></div>
+      <div id="zone-terminer" hidden>
+        <button id="btn-terminer" class="btn btn-secondaire btn-large">
+          ✅ J'ai fini mes courses
+        </button>
+        <p class="aide centre">Les articles cochés quittent la liste. Ils restent dans « Déjà achetés ».</p>
+      </div>
+    </section>
+
+    <!-- Vue : déjà achetés -->
+    <section id="vue-historique" class="vue" hidden>
+      <label class="recherche">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+        <input id="h-recherche" type="search" placeholder="Chercher un produit…" aria-label="Chercher un produit">
+      </label>
+      <p class="aide">Touchez <b>＋</b> pour remettre un produit dans la liste.</p>
+      <div id="historique" class="grille"></div>
+      <div id="historique-vide" class="vide" hidden>
+        <div class="vide-emoji">📖</div>
+        <p class="vide-titre">Rien pour l'instant</p>
+        <p>Tout ce que vous ajoutez à la liste sera gardé ici pour la prochaine fois.</p>
+      </div>
+    </section>
+
+    <!-- Bouton principal -->
+    <button id="btn-ajouter" class="btn-ajouter">
+      <span class="plus">＋</span> Ajouter
+    </button>
+
+    <!-- Navigation du bas -->
+    <nav class="onglets" aria-label="Navigation">
+      <button class="onglet actif" data-vue="liste">
+        <span class="onglet-emoji">🛒</span>
+        <span>Ma liste</span>
+        <span id="badge-liste" class="badge" hidden></span>
+      </button>
+      <button class="onglet" data-vue="historique">
+        <span class="onglet-emoji">📖</span>
+        <span>Déjà achetés</span>
+      </button>
+    </nav>
+  </div>
+
+  <!-- Fenêtre : ajouter / modifier -->
+  <div id="feuille" class="feuille-fond" hidden>
+    <form id="form-produit" class="feuille" novalidate>
+      <div class="feuille-poignee"></div>
+      <div class="feuille-haut">
+        <h2 id="f-titre">Ajouter un produit</h2>
+        <button type="button" class="btn-rond fermer" data-fermer aria-label="Fermer">✕</button>
+      </div>
+
+      <label class="champ">
+        <span>Quoi ?</span>
+        <input id="f-nom" type="text" autocomplete="off" placeholder="Ex. : du lait, des pommes…" maxlength="60" enterkeyhint="done">
+      </label>
+      <div id="f-suggestions" class="suggestions" hidden></div>
+
+      <div class="champ">
+        <span>Combien ?</span>
+        <div class="quantite">
+          <button type="button" class="btn-rond" id="f-moins" aria-label="Un de moins">−</button>
+          <input id="f-quantite" type="text" value="1" maxlength="20" aria-label="Quantité">
+          <button type="button" class="btn-rond" id="f-plus" aria-label="Un de plus">＋</button>
+        </div>
+      </div>
+
+      <div class="champ">
+        <span>Photo <small>(pas obligatoire)</small></span>
+        <div class="photo-zone">
+          <img id="f-apercu" alt="" hidden>
+          <label class="btn btn-photo">
+            <input id="f-photo" type="file" accept="image/*" hidden>
+            <span id="f-photo-texte">📷 Prendre ou choisir une photo</span>
+          </label>
+          <button type="button" id="f-photo-retirer" class="btn-texte danger" hidden>Enlever la photo</button>
+        </div>
+      </div>
+
+      <div class="champ">
+        <span>Rayon</span>
+        <div id="f-rayons" class="puces"></div>
+      </div>
+
+      <label class="champ">
+        <span>Petite note <small>(pas obligatoire)</small></span>
+        <input id="f-note" type="text" placeholder="Ex. : la marque bleue, en promo…" maxlength="120">
+      </label>
+
+      <p id="f-erreur" class="erreur" role="alert" hidden></p>
+      <button type="submit" class="btn btn-principal btn-large" id="f-valider">Ajouter à la liste</button>
+
+      <div id="f-actions" class="actions-secondaires" hidden>
+        <button type="button" id="f-retirer" class="btn btn-contour">Retirer de la liste</button>
+        <button type="button" id="f-supprimer" class="btn-texte danger">Supprimer pour toujours</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Fenêtre : photo en grand -->
+  <div id="visionneuse" class="visionneuse" hidden>
+    <img id="v-image" alt="">
+    <p id="v-legende"></p>
+    <button class="btn btn-principal" data-fermer>Fermer</button>
+  </div>
+
+  <!-- Menu -->
+  <div id="menu" class="feuille-fond" hidden>
+    <div class="feuille petite">
+      <div class="feuille-poignee"></div>
+      <p id="menu-compte" class="aide centre"></p>
+      <button id="btn-deconnexion" class="btn btn-contour btn-large">Se déconnecter</button>
+      <button class="btn-texte centre" data-fermer>Fermer</button>
+    </div>
+  </div>
+
+  <!-- Confirmation -->
+  <div id="confirmation" class="feuille-fond" hidden>
+    <div class="feuille petite">
+      <p id="conf-texte" class="conf-texte"></p>
+      <button id="conf-oui" class="btn btn-danger btn-large">Oui</button>
+      <button id="conf-non" class="btn btn-contour btn-large">Non, annuler</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="status" hidden>
+    <span id="toast-texte"></span>
+    <button id="toast-annuler" class="btn-texte" hidden>Annuler</button>
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
