@@ -189,6 +189,9 @@ let pointeur = { x: 0, y: 0 }, pointeurLisse = { x: 0, y: 0 };
 // Bande libre de l'écran de connexion, en fractions de la hauteur : entre le
 // texte d'accueil et le formulaire. La page la mesure et nous la donne.
 let zone = { haut: 0.3, bas: 0.55 };
+// Plus de place pour le panier (formulaire d'inscription sur petit écran) :
+// les fruits restent sur les bords, comme dans la liste.
+let zoneEtroite = false;
 
 function redimensionner() {
   if (!rendu) return;
@@ -214,7 +217,7 @@ let enMarche = false;
 
 function image(t) {
   const dt = Math.min(0.05, horloge.getDelta());
-  const cible = mode === "connexion" ? 1 : 0;
+  const cible = mode === "connexion" && !zoneEtroite ? 1 : 0;
   melange += (cible - melange) * Math.min(1, dt * 2.5);
   pointeurLisse.x += (pointeur.x - pointeurLisse.x) * 0.05;
   pointeurLisse.y += (pointeur.y - pointeurLisse.y) * 0.05;
@@ -294,6 +297,7 @@ export const decor = {
   demarrer,
   zone(haut, bas) {
     zone = { haut, bas };
+    zoneEtroite = bas - haut < 0.12;
     if (moinsAnimer && rendu) image(0);
   },
   mode(m) {

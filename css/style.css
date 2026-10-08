@@ -328,3 +328,60 @@ button { cursor: pointer; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* ── Connexion : deux modes ──────────────────────────── */
+.bascule {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 4px;
+  background: #f3e8dc; border-radius: 16px; padding: 4px; margin-bottom: 1.1em;
+}
+.bascule-btn {
+  border: 0; background: none; border-radius: 12px; min-height: 50px;
+  font-weight: 800; font-size: 0.98rem; color: var(--texte-doux);
+}
+.bascule-btn.actif { background: #fff; color: var(--texte); box-shadow: 0 2px 8px rgba(84, 52, 20, 0.12); }
+.champ .aide { display: block; margin: 0.4em 0 0; }
+
+/* ── Famille ─────────────────────────────────────────── */
+.nom-famille { margin: 0; font-weight: 800; color: var(--vert-fonce); font-size: 0.95rem; }
+.carte-code { background: var(--vert-pale); border-radius: 18px; padding: 0.9em; text-align: center; }
+.carte-code p { margin: 0 0 0.4em; font-weight: 700; }
+.code {
+  font-size: 1.6rem; font-weight: 900; letter-spacing: 0.08em; color: var(--vert-fonce);
+  font-variant-numeric: tabular-nums; user-select: all;
+}
+.carte-code .btn { width: 100%; }
+
+/* ── Ajout rapide ────────────────────────────────────── */
+.rapide { margin: 0.2em -16px 0.6em; }
+.rapide-titre { font-size: 1.05rem; font-weight: 900; margin: 0 16px 0.45em; }
+.rapide-titre small { display: block; font-size: 0.85rem; font-weight: 700; color: var(--texte-doux); }
+.rapide-liste {
+  display: flex; gap: 0.5em; overflow-x: auto; padding: 0.2em 16px 0.7em;
+  scroll-snap-type: x proximity; scrollbar-width: none;
+}
+.rapide-liste::-webkit-scrollbar { display: none; }
+.rapide-carte {
+  flex: none; width: 132px; scroll-snap-align: start;
+  display: flex; flex-direction: column; align-items: center; gap: 0.3em;
+  background: var(--carte); border: 0; border-radius: 18px; box-shadow: var(--ombre);
+  padding: 0.55em 0.45em 0.6em; text-align: center;
+}
+.rapide-carte:active { transform: scale(0.95); }
+.rapide-carte .vignette { width: 64px; height: 64px; }
+.rapide-nom { font-weight: 800; font-size: 0.92rem; line-height: 1.15; overflow-wrap: break-word; hyphens: auto; }
+.rapide-carte .prix-max { margin: 0; font-size: 0.85rem; white-space: nowrap; }
+.prix-max, .qte { white-space: nowrap; }
+.rapide-plus {
+  white-space: nowrap; margin-top: auto;
+  font-weight: 900; font-size: 0.85rem; color: #fff; background: var(--vert);
+  border-radius: 999px; padding: 0.15em 0.7em;
+}
+
+/* ── Prix maximum ────────────────────────────────────── */
+.prix { position: relative; }
+.prix input { padding-right: 2.2em; }
+.prix-unite { position: absolute; right: 0.9em; top: 50%; translate: 0 -50%; font-weight: 900; font-size: 1.2rem; color: var(--texte-doux); }
+.prix-max {
+  display: inline-block; background: #fff4d6; color: #8a5a00;
+  border-radius: 999px; padding: 0.05em 0.6em; font-weight: 900; margin-right: 0.35em;
+}

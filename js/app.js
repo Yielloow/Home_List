@@ -5,7 +5,7 @@
 // centaines de produits, c'est largement assez rapide et ça évite toute
 // désynchronisation entre deux téléphones.
 
-import { creerDepot, modeDemo } from "./donnees.js";
+import { creerDepot, modeDemo, nettoyerCode } from "./donnees.js";
 import { preparerPhoto } from "./photo.js";
 import { decor } from "./scene.js";
 
@@ -56,6 +56,15 @@ function cle(texte) {
 const majuscule = (t) => t.charAt(0).toUpperCase() + t.slice(1);
 const echapper = (t) => String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
+// « 2,5 » devient 2.5 ; vide ou illisible devient null
+function lirePrix(texte) {
+  const n = parseFloat(String(texte || "").replace(",", ".").replace(/[^\d.]/g, ""));
+  return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null;
+}
+const euros = (n) => n.toLocaleString("fr-BE", { style: "currency", currency: "EUR" });
+// « 6 », « 2 paquets » comptent 6 et 2 ; « un peu » compte 1
+const combien = (q) => { const m = String(q || "").match(/\d+/); return m ? parseInt(m[0], 10) : 1; };
+
 // ── État ──────────────────────────────────────────────────────────────
 
 let depot;
@@ -80,27 +89,36 @@ init().catch((e) => {
 async function init() {
   depot = await creerDepot();
   $("#c-demo").hidden = !modeDemo;
-  depot.surConnexion((c) => {
-    compte = c;
-    if (desabonner) { desabonner(); desabonner = null; }
-    if (c) {
-      montrerEcran("app");
-      desabonner = depot.suivreProduits((liste) => {
-        produits = liste;
-        dessiner();
-      }, (err) => {
-        console.error(err);
-        if (err.code === "permission-denied") {
-          toast("Ce compte n'a pas encore accès à la liste.");
-        } else {
-          toast("Problème de connexion avec la liste.");
-        }
-      });
-    } else {
-      produits = [];
-      montrerEcran("connexion");
-    }
-  });
+  depot.surConnexion(appliquerCompte);
+}
+
+function appliquerCompte(c) {
+  compte = c;
+  if (desabonner) { desabonner(); desabonner = null; }
+  produits = [];
+  if (c && c.famille) {
+    $("#nom-famille").textContent = c.nomFamille || "";
+    montrerEcran("app");
+    desabonner = depot.suivreProduits((liste) => {
+      produits = liste;
+      dessiner();
+    }, (err) => {
+      console.error(err);
+      toast(err.code === "permission-denied"
+        ? "Ce compte n'a pas accès à la liste de cette famille."
+        : "Problème de connexion avec la liste.");
+    });
+  } else {
+    montrerEcran("connexion");
+  }
+  // Connecté sans famille : on demande le code au lieu du mot de passe
+  const sansFamille = !!(c && !c.famille);
+  $("#form-connexion").hidden = sansFamille;
+  $("#form-rejoindre").hidden = !sansFamille;
+  $("#sous-titre").textContent = sansFamille
+    ? `Bonjour ${c.pseudo} !`
+    : "Bonjour ! Connectez-vous pour voir la liste.";
+  mesurerZone();
 }
 
 function montrerEcran(nom) {
@@ -113,8 +131,9 @@ function montrerEcran(nom) {
 // Le panier 3D se loge entre le texte d'accueil et le formulaire
 function mesurerZone() {
   if ($("#ecran-connexion").hidden) return;
-  const haut = $(".sous-titre").getBoundingClientRect().bottom;
-  const bas = $("#form-connexion").getBoundingClientRect().top;
+  const haut = $("#sous-titre").getBoundingClientRect().bottom;
+  const formulaire = $("#form-connexion").hidden ? $("#form-rejoindre") : $("#form-connexion");
+  const bas = formulaire.getBoundingClientRect().top;
   decor.zone(haut / innerHeight, bas / innerHeight);
 }
 addEventListener("resize", mesurerZone);
@@ -129,35 +148,90 @@ $("#voir-mdp").addEventListener("click", () => {
   $("#voir-mdp").textContent = visible ? "Voir" : "Cacher";
 });
 
+let modeConnexion = "connexion";
+document.querySelectorAll(".bascule-btn").forEach((b) => {
+  b.addEventListener("click", () => changerModeConnexion(b.dataset.mode));
+});
+
+function changerModeConnexion(mode) {
+  modeConnexion = mode;
+  const inscription = mode === "inscription";
+  document.querySelectorAll(".bascule-btn").forEach((b) => b.classList.toggle("actif", b.dataset.mode === mode));
+  $("#champ-code").hidden = !inscription;
+  $("#aide-mdp").hidden = !inscription;
+  $("#c-mdp").autocomplete = inscription ? "new-password" : "current-password";
+  $("#c-bouton").textContent = inscription ? "Créer mon compte" : "Entrer";
+  $("#c-erreur").hidden = true;
+  mesurerZone();
+}
+
+const MESSAGES_COMPTE = {
+  "auth/invalid-credential": "Le nom d'utilisateur ou le mot de passe ne correspond pas. Réessayez doucement.",
+  "auth/wrong-password": "Le mot de passe ne correspond pas.",
+  "auth/user-not-found": "Ce nom d'utilisateur n'existe pas.",
+  "auth/invalid-email": "Le nom d'utilisateur n'est pas valable. Utilisez des lettres et des chiffres.",
+  "auth/email-already-in-use": "Ce nom d'utilisateur est déjà pris. Choisissez-en un autre (par exemple avec votre prénom).",
+  "auth/weak-password": "Le mot de passe est trop court : au moins 6 caractères.",
+  "auth/too-many-requests": "Trop d'essais. Attendez quelques minutes puis réessayez.",
+  "auth/network-request-failed": "Pas de connexion Internet.",
+  "famille/code-inconnu": "Ce code de famille n'existe pas. Vérifiez-le auprès de la personne qui vous l'a donné.",
+  "famille/pseudo-court": "Le nom d'utilisateur doit faire au moins 3 lettres.",
+  "permission-denied": "Ce code de famille n'est pas accepté.",
+};
+
 $("#form-connexion").addEventListener("submit", async (e) => {
   e.preventDefault();
-  const email = $("#c-email").value.trim();
+  const pseudo = $("#c-pseudo").value.trim();
   const mdp = $("#c-mdp").value;
-  if (!modeDemo && (!email || !mdp)) {
-    afficherErreurConnexion("Il faut remplir l'adresse e-mail et le mot de passe.");
-    return;
+  const inscription = modeConnexion === "inscription";
+  if (!modeDemo) {
+    if (!pseudo || !mdp) {
+      afficherErreurConnexion("Il faut remplir le nom d'utilisateur et le mot de passe.");
+      return;
+    }
+    if (inscription && !nettoyerCode($("#c-code").value)) {
+      afficherErreurConnexion("Il faut le code de la famille pour créer un compte.");
+      return;
+    }
   }
   const bouton = $("#c-bouton");
   bouton.disabled = true;
   bouton.textContent = "Un instant…";
   $("#c-erreur").hidden = true;
   try {
-    await depot.connecter(email, mdp);
+    if (inscription) {
+      appliquerCompte(await depot.inscrire(pseudo, mdp, $("#c-code").value));
+      toast(`Bienvenue dans la ${compte.nomFamille} !`);
+    } else {
+      await depot.connecter(pseudo, mdp);
+    }
   } catch (err) {
-    const messages = {
-      "auth/invalid-credential": "L'adresse e-mail ou le mot de passe ne correspond pas. Réessayez doucement.",
-      "auth/wrong-password": "Le mot de passe ne correspond pas.",
-      "auth/user-not-found": "Cette adresse e-mail n'est pas connue.",
-      "auth/invalid-email": "L'adresse e-mail n'est pas bien écrite.",
-      "auth/too-many-requests": "Trop d'essais. Attendez quelques minutes puis réessayez.",
-      "auth/network-request-failed": "Pas de connexion Internet.",
-    };
-    afficherErreurConnexion(messages[err.code] || "La connexion n'a pas marché. Réessayez.");
+    console.error(err);
+    afficherErreurConnexion(MESSAGES_COMPTE[err.code] || "Ça n'a pas marché. Réessayez.");
   } finally {
     bouton.disabled = false;
-    bouton.textContent = "Entrer";
+    bouton.textContent = inscription ? "Créer mon compte" : "Entrer";
   }
 });
+
+$("#form-rejoindre").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const bouton = $("#r-bouton");
+  bouton.disabled = true;
+  $("#r-erreur").hidden = true;
+  try {
+    appliquerCompte(await depot.rejoindreFamille($("#r-code").value));
+    toast(`Bienvenue dans la ${compte.nomFamille} !`);
+  } catch (err) {
+    console.error(err);
+    const el = $("#r-erreur");
+    el.textContent = MESSAGES_COMPTE[err.code] || "Ça n'a pas marché. Réessayez.";
+    el.hidden = false;
+  } finally {
+    bouton.disabled = false;
+  }
+});
+$("#r-deconnexion").addEventListener("click", () => depot.deconnecter());
 
 function afficherErreurConnexion(texte) {
   const el = $("#c-erreur");
@@ -197,6 +271,11 @@ function dessiner() {
     $("#resume").textContent = dansListe.length === 0 ? "Rien à acheter pour l'instant"
       : restants === 0 ? "Tout est dans le caddie 🎉"
       : `${restants} ${restants > 1 ? "choses" : "chose"} à acheter`;
+    const avecPrix = dansListe.filter((p) => !p.achete && p.prixMax);
+    if (avecPrix.length) {
+      const budget = avecPrix.reduce((t, p) => t + p.prixMax * combien(p.quantite), 0);
+      $("#resume").textContent += ` · ${euros(budget)} max`;
+    }
   } else {
     $("#resume").textContent = `${produits.length} ${produits.length > 1 ? "produits gardés" : "produit gardé"}`;
   }
@@ -209,6 +288,20 @@ function dessiner() {
 }
 
 function dessinerListe(dansListe, coches) {
+  // Ajout rapide : les habitués qui ne sont pas sur la liste, les plus achetés d'abord
+  const habitues = produits
+    .filter((p) => !p.dansListe)
+    .sort((a, b) => (b.fois || 0) - (a.fois || 0) || (b.dernierAchat || 0) - (a.dernierAchat || 0))
+    .slice(0, 15);
+  $("#rapide").hidden = habitues.length === 0;
+  $("#rapide-liste").innerHTML = habitues.map((p) => `
+    <button class="rapide-carte" data-id="${p.id}" data-action="remettre" aria-label="Remettre ${echapper(p.nom)} dans la liste">
+      ${vignetteHTML(p)}
+      <span class="rapide-nom">${echapper(p.nom)}</span>
+      ${p.prixMax ? `<span class="prix-max">max ${euros(p.prixMax)}</span>` : ""}
+      <span class="rapide-plus">＋ Ajouter</span>
+    </button>`).join("");
+
   $("#liste-vide").hidden = dansListe.length > 0;
   $("#zone-terminer").hidden = coches === 0;
   $("#btn-terminer").textContent = `✅ J'ai fini mes courses (${coches} dans le caddie)`;
@@ -229,6 +322,7 @@ function dessinerListe(dansListe, coches) {
     for (const p of articles) {
       const detail = [
         p.quantite && p.quantite !== "1" ? `<span class="qte">× ${echapper(p.quantite)}</span>` : "",
+        p.prixMax ? `<span class="prix-max">max ${euros(p.prixMax)}</span>` : "",
         p.note ? echapper(p.note) : "",
       ].join("");
       html += `
@@ -262,6 +356,7 @@ function dessinerHistorique() {
       ${p.vignette ? `<button class="vignette" data-action="photo" aria-label="Voir la photo"><img class="vignette" src="${p.vignette}" alt=""></button>` : vignetteHTML(p)}
       <div class="tuile-nom">${echapper(p.nom)}</div>
       <div class="tuile-info">${rayon(p.rayon).emoji} ${(p.fois || 1) > 1 ? `acheté ${p.fois} fois` : rayon(p.rayon).nom}</div>
+      ${p.prixMax ? `<div><span class="prix-max">max ${euros(p.prixMax)}</span></div>` : ""}
       ${p.dansListe
         ? `<button class="tuile-bouton dedans" data-action="modifier">✓ Déjà dans la liste</button>`
         : `<button class="tuile-bouton" data-action="remettre">＋ Ajouter</button>`}
@@ -272,7 +367,7 @@ function dessinerHistorique() {
 $("#h-recherche").addEventListener("input", () => dessinerHistorique());
 
 // Un seul écouteur pour la liste et l'historique
-for (const conteneur of [$("#liste"), $("#historique")]) {
+for (const conteneur of [$("#liste"), $("#historique"), $("#rapide-liste")]) {
   conteneur.addEventListener("click", (e) => {
     const bouton = e.target.closest("[data-action]");
     if (!bouton) return;
@@ -314,7 +409,7 @@ function cocher(p, bouton) {
 }
 
 function remettre(p, bouton) {
-  ecrire(depot.modifier(p.id, { dansListe: true, achete: false, quantite: "1", fois: (p.fois || 0) + 1, ajouteLe: Date.now() }));
+  ecrire(depot.modifier(p.id, { dansListe: true, achete: false, fois: (p.fois || 0) + 1, ajouteLe: Date.now() }));
   const r = bouton.getBoundingClientRect();
   if (r.width) decor.celebrer((r.left + r.width / 2) / innerWidth, (r.top + r.height / 2) / innerHeight);
   else decor.celebrer(0.5, 0.85);
@@ -365,6 +460,7 @@ function ouvrirFeuille(p, nomInitial = "") {
   $("#f-nom").value = p ? p.nom : nomInitial;
   $("#f-quantite").value = p ? (p.quantite || "1") : "1";
   $("#f-note").value = p ? (p.note || "") : "";
+  $("#f-prix").value = p && p.prixMax ? String(p.prixMax).replace(".", ",") : "";
   $("#f-erreur").hidden = true;
   $("#f-suggestions").hidden = true;
   $("#f-actions").hidden = !p;
@@ -476,6 +572,7 @@ $("#form-produit").addEventListener("submit", (e) => {
     quantite: $("#f-quantite").value.trim() || "1",
     note: $("#f-note").value.trim(),
     rayon: rayonChoisi || devinerRayon(nom) || "autre",
+    prixMax: lirePrix($("#f-prix").value),
   };
   if (photoEnAttente) { champs.vignette = photoEnAttente.vignette; champs.photo = true; }
   if (photoEnAttente === null) { champs.vignette = null; champs.photo = false; }
@@ -552,12 +649,27 @@ async function voirPhoto(p) {
 // ── Menu, confirmation, messages ──────────────────────────────────────
 
 $("#btn-menu").addEventListener("click", () => {
-  $("#menu-compte").textContent = compte ? `Connectée avec ${compte.email}` : "";
+  $("#menu-compte").textContent = compte ? `Connecté(e) : ${compte.pseudo} · ${compte.nomFamille || ""}` : "";
+  $("#menu-code").textContent = compte && compte.code ? formaterCode(compte.code) : "";
+  $("#menu-famille").hidden = !(compte && compte.code);
   $("#menu").hidden = false;
 });
 $("#btn-deconnexion").addEventListener("click", async () => {
   fermer($("#menu"));
   if (await confirmer("Se déconnecter ? Il faudra retaper le mot de passe.")) depot.deconnecter();
+});
+
+// MONE7K4PQ9TX s'affiche MONE-7K4P-Q9TX
+function formaterCode(c) {
+  return nettoyerCode(c).match(/.{1,4}/g).join("-");
+}
+$("#btn-copier-code").addEventListener("click", async () => {
+  try {
+    await navigator.clipboard.writeText($("#menu-code").textContent);
+    toast("Code copié");
+  } catch {
+    toast("Copie impossible : recopiez le code à la main");
+  }
 });
 
 function confirmer(texte) {

@@ -26,23 +26,46 @@
   <main id="ecran-connexion" class="ecran" hidden>
     <div class="connexion-haut">
       <h1>Ma liste<br>de courses</h1>
-      <p class="sous-titre">Bonjour ! Connectez-vous pour voir la liste.</p>
+      <p class="sous-titre" id="sous-titre">Bonjour ! Connectez-vous pour voir la liste.</p>
     </div>
     <form id="form-connexion" class="carte connexion-carte" novalidate>
-      <label class="champ">
-        <span>Adresse e-mail</span>
-        <input id="c-email" type="email" autocomplete="username" inputmode="email" required>
+      <div class="bascule" role="tablist">
+        <button type="button" class="bascule-btn actif" data-mode="connexion" role="tab">J'ai déjà un compte</button>
+        <button type="button" class="bascule-btn" data-mode="inscription" role="tab">Première fois</button>
+      </div>
+      <label class="champ" id="champ-pseudo">
+        <span>Nom d'utilisateur</span>
+        <input id="c-pseudo" type="text" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Ex. : maman" maxlength="40">
       </label>
-      <label class="champ">
+      <label class="champ" id="champ-mdp">
         <span>Mot de passe</span>
         <div class="mdp">
-          <input id="c-mdp" type="password" autocomplete="current-password" required>
+          <input id="c-mdp" type="password" autocomplete="current-password">
           <button type="button" id="voir-mdp" class="btn-texte" aria-label="Afficher le mot de passe">Voir</button>
         </div>
+        <small id="aide-mdp" class="aide" hidden>Au moins 6 caractères. Notez-le quelque part !</small>
+      </label>
+      <label class="champ" id="champ-code" hidden>
+        <span>Code de la famille</span>
+        <input id="c-code" type="text" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" placeholder="Ex. : MONE-7K4P-Q9TX" maxlength="24">
+        <small class="aide">Demandez ce code à la personne qui vous a invité.</small>
       </label>
       <p id="c-erreur" class="erreur" role="alert" hidden></p>
       <button type="submit" class="btn btn-principal btn-large" id="c-bouton">Entrer</button>
       <p id="c-demo" class="aide" hidden>Mode essai : Firebase n'est pas encore configuré. Tapez n'importe quoi pour entrer, rien n'est envoyé sur Internet.</p>
+    </form>
+
+    <!-- Compte connecté mais pas encore relié à une famille -->
+    <form id="form-rejoindre" class="carte connexion-carte" novalidate hidden>
+      <p class="vide-titre">Rejoindre une famille</p>
+      <p class="aide">Ce compte n'est relié à aucune famille. Tapez le code de la famille pour voir sa liste.</p>
+      <label class="champ">
+        <span>Code de la famille</span>
+        <input id="r-code" type="text" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" placeholder="Ex. : MONE-7K4P-Q9TX" maxlength="24">
+      </label>
+      <p id="r-erreur" class="erreur" role="alert" hidden></p>
+      <button type="submit" class="btn btn-principal btn-large" id="r-bouton">Rejoindre</button>
+      <button type="button" id="r-deconnexion" class="btn-texte centre">Changer de compte</button>
     </form>
   </main>
 
@@ -50,6 +73,7 @@
   <div id="ecran-app" class="ecran" hidden>
     <header class="entete">
       <div>
+        <p id="nom-famille" class="nom-famille"></p>
         <h1 id="titre-vue">Ma liste</h1>
         <p id="resume" class="resume"></p>
       </div>
@@ -60,6 +84,10 @@
 
     <!-- Vue : la liste -->
     <section id="vue-liste" class="vue">
+      <div id="rapide" class="rapide" hidden>
+        <h2 class="rapide-titre">⚡ Ajout rapide <small>touchez pour remettre dans la liste</small></h2>
+        <div id="rapide-liste" class="rapide-liste"></div>
+      </div>
       <div id="liste-vide" class="vide" hidden>
         <div class="vide-emoji">🧺</div>
         <p class="vide-titre">La liste est vide</p>
@@ -132,6 +160,15 @@
         </div>
       </div>
 
+      <label class="champ">
+        <span>Prix maximum <small>(pas obligatoire)</small></span>
+        <div class="prix">
+          <input id="f-prix" type="text" inputmode="decimal" placeholder="Ex. : 2,50" maxlength="8" autocomplete="off">
+          <span class="prix-unite">€</span>
+        </div>
+        <small class="aide">Au magasin, on sait tout de suite si c'est trop cher.</small>
+      </label>
+
       <div class="champ">
         <span>Photo <small>(pas obligatoire)</small></span>
         <div class="photo-zone">
@@ -176,6 +213,11 @@
     <div class="feuille petite">
       <div class="feuille-poignee"></div>
       <p id="menu-compte" class="aide centre"></p>
+      <div id="menu-famille" class="carte-code">
+        <p>Pour inviter quelqu'un de la famille, donnez-lui ce code :</p>
+        <p id="menu-code" class="code"></p>
+        <button id="btn-copier-code" class="btn btn-contour">Copier le code</button>
+      </div>
       <button id="btn-deconnexion" class="btn btn-contour btn-large">Se déconnecter</button>
       <button class="btn-texte centre" data-fermer>Fermer</button>
     </div>

@@ -1,36 +1,61 @@
 rules_version = '2';
 
-// Seuls les comptes déclarés dans la collection « membres » voient la liste.
+// Une liste par famille. On rejoint une famille avec son code, et seulement
+// comme ça : aucune famille ni aucun code ne se crée depuis l'application.
 //
-// Pour donner l'accès à quelqu'un : créer son compte dans Authentication,
-// copier son « UID utilisateur », puis dans Firestore créer le document
-// membres/<UID> (un champ quelconque, par exemple nom = "Maman").
-// Ainsi aucune adresse e-mail n'apparaît dans ce dépôt public, et une personne
-// qui se créerait un compte toute seule ne verrait rien.
+//   codes/<CODE>                 { famille }        créé par l'administrateur
+//   familles/<id>                { nom, code }      créé par l'administrateur
+//   familles/<id>/produits/<id>  la liste et l'historique de la famille
+//   familles/<id>/photos/<id>    { image }          photo en grand
+//   membres/<uid>                { famille, pseudo, code, creeLe }
+//
+// La fiche membre n'est acceptée que si le code qu'elle porte mène bien à la
+// famille demandée : impossible de s'inviter chez quelqu'un sans son code.
 
 service cloud.firestore {
   match /databases/{base}/documents {
 
-    function membre() {
-      return request.auth != null
-        && exists(/databases/$(base)/documents/membres/$(request.auth.uid));
+    function connecte() {
+      return request.auth != null;
     }
 
-    match /produits/{id} {
-      allow read, write: if membre();
+    function deLaFamille(f) {
+      return connecte()
+        && exists(/databases/$(base)/documents/membres/$(request.auth.uid))
+        && get(/databases/$(base)/documents/membres/$(request.auth.uid)).data.famille == f;
     }
 
-    match /photos/{id} {
-      allow read, delete: if membre();
-      allow create, update: if membre()
-        && request.resource.data.image is string
-        && request.resource.data.image.size() < 900000;
+    // Lisible un par un, à condition de connaître le code ; jamais listé
+    match /codes/{code} {
+      allow get: if true;
+      allow list, write: if false;
     }
 
-    // La liste des membres se gère uniquement depuis la console Firebase
     match /membres/{uid} {
-      allow read: if request.auth != null && request.auth.uid == uid;
-      allow write: if false;
+      allow get: if connecte() && request.auth.uid == uid;
+      allow create: if connecte() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['famille', 'pseudo', 'code', 'creeLe'])
+        && request.resource.data.code is string
+        && exists(/databases/$(base)/documents/codes/$(request.resource.data.code))
+        && get(/databases/$(base)/documents/codes/$(request.resource.data.code)).data.famille
+           == request.resource.data.famille;
+      allow list, update, delete: if false;
+    }
+
+    match /familles/{f} {
+      allow get: if deLaFamille(f);
+      allow list, write: if false;
+
+      match /produits/{id} {
+        allow read, write: if deLaFamille(f);
+      }
+
+      match /photos/{id} {
+        allow read, delete: if deLaFamille(f);
+        allow create, update: if deLaFamille(f)
+          && request.resource.data.image is string
+          && request.resource.data.image.size() < 900000;
+      }
     }
   }
 }
