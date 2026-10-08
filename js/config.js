@@ -9,10 +9,10 @@
 // tout reste dans le navigateur, rien n'est envoyé sur Internet.
 
 export const firebaseConfig = {
-  apiKey: "A_REMPLIR",
-  authDomain: "",
-  projectId: "",
-  storageBucket: "",
-  messagingSenderId: "",
-  appId: "",
+  apiKey: "AIzaSyDcEPZHgUAX9LqPjW0saHZrBHdfJflKxec",
+  authDomain: "home-list-cb734.firebaseapp.com",
+  projectId: "home-list-cb734",
+  storageBucket: "home-list-cb734.firebasestorage.app",
+  messagingSenderId: "701252749273",
+  appId: "1:701252749273:web:65ee7fde5ba275c55bfbc8",
 };
